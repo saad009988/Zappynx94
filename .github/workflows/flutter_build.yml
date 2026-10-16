@@ -1,0 +1,75 @@
+name: Flutter Cloud Build
+
+on:
+  push:
+    branches:
+      - main # Jab aap main branch par push karenge tab build chalegi
+  workflow_dispatch: # Isse aap manually bhi browser se build start kar sakte hain
+
+jobs:
+  # 🤖 JOB 1: Android Build (APK & AAB)
+  build_android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build APK & AAB
+        run: |
+          flutter build apk --release
+          flutter build appbundle --release
+
+      - name: Upload Android Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-builds
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+
+  # 🍏 JOB 2: iOS Build (IPA) - Runs on macOS
+  build_ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Xcode Project (No Code Sign)
+        # Note: App Store par upload karne ke liye p12 certificate lagta hai, 
+        # local testing ke liye aap bina sign ke ipa (xcarchive) bana sakte hain.
+        run: flutter build ios --release --no-codesign
+
+      - name: Zip iOS Build
+        run: |
+          mkdir -p build/ios/iphoneos_zip
+          mv build/ios/iphoneos/Runner.app build/ios/iphoneos_zip/
+          cd build/ios/iphoneos_zip && zip -r ../Runner.ipa Runner.app
+
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: build/ios/Runner.ipa
+          
